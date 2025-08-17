@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, Shield, Hotel } from "lucide-react";
+import { RateLimiter, sanitizeInput, validateEmail, validatePassword } from "@/lib/security";
 
 const Auth = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [rateLimiter] = useState(() => new RateLimiter(5, 15 * 60 * 1000)); // 5 attempts per 15 minutes
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -118,6 +120,21 @@ const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check rate limiting
+    const clientIP = 'user'; // In production, use actual IP
+    const rateCheck = rateLimiter.isAllowed(clientIP);
+    
+    if (!rateCheck.allowed) {
+      const resetTime = new Date(rateCheck.resetTime!);
+      toast({
+        title: "Too Many Attempts",
+        description: `Please try again after ${resetTime.toLocaleTimeString()}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
