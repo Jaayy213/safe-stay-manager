@@ -27,6 +27,12 @@ export const useAuth = () => {
         .single();
 
       if (error) {
+        // If user doesn't exist in custom users table, create it
+        if (error.code === 'PGRST116' || error.message.includes('No rows found')) {
+          console.log("User not found in custom users table, creating record...");
+          await createUserRecord(userId);
+          return;
+        }
         console.error("Error fetching user profile:", error);
         return;
       }
@@ -34,6 +40,45 @@ export const useAuth = () => {
       setUserProfile(data);
     } catch (error) {
       console.error("Error fetching user profile:", error);
+    }
+  };
+
+  const createUserRecord = async (userId: string) => {
+    try {
+      // Get the current auth user data
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      
+      if (!authUser) return;
+
+      const { error } = await supabase
+        .from("users")
+        .insert({
+          id: userId,
+          email: authUser.email || "",
+          first_name: authUser.user_metadata?.first_name || "",
+          last_name: authUser.user_metadata?.last_name || "",
+          phone: authUser.user_metadata?.phone || "",
+          role: "guest",
+          password_hash: "managed_by_supabase_auth",
+        });
+
+      if (error) {
+        console.error("Failed to create user record:", error);
+        return;
+      }
+
+      // Fetch the newly created profile
+      const { data } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (data) {
+        setUserProfile(data);
+      }
+    } catch (error) {
+      console.error("Error creating user record:", error);
     }
   };
 

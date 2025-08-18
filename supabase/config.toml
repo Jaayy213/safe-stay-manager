@@ -1,1 +1,14 @@
 project_id = "xevfzvyoipadebnuyolf"
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+site_url = "http://localhost:8080"
+
+[auth.smtp]
+host = "smtp.gmail.com"
+port = 587
+user = "eshunjemimah14@gmail.com"
+pass = "rxpa enpo gbhh upid"   # not your Gmail password
+sender_name = "Safe Stay Manager"
+sender_email = "your_email@gmail.com"

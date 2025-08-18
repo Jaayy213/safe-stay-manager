@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, Calendar, Plus, Users, DollarSign, Clock, FileText } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { generateCSRFToken } from "@/lib/security";
 
 interface Booking {
@@ -49,6 +49,7 @@ interface Room {
 const Bookings = () => {
   const { user, userProfile, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const preselectedRoomId = searchParams.get("room");
   
@@ -123,6 +124,13 @@ const Bookings = () => {
     fetchRooms();
   }, [isAdmin, user?.id]);
 
+  // Auto-open dialog when accessing /bookings/create
+  useEffect(() => {
+    if (location.pathname === '/bookings/create') {
+      setDialogOpen(true);
+    }
+  }, [location.pathname]);
+
   useEffect(() => {
     // Generate CSRF token when dialog opens
     if (dialogOpen) {
@@ -163,6 +171,26 @@ const Bookings = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if user is authenticated
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to create a booking",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if user profile exists
+    if (!userProfile) {
+      toast({
+        title: "Profile Error",
+        description: "User profile not found. Please try signing out and back in.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Input validation
     if (!formData.room_id || !formData.check_in_date || !formData.check_out_date) {
@@ -227,11 +255,69 @@ const Bookings = () => {
     };
 
     try {
+      console.log("Attempting to create booking with data:", bookingData);
+      console.log("Current user:", user);
+      console.log("User profile:", userProfile);
+      
       const { error } = await supabase
         .from("bookings")
         .insert(bookingData);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase booking error:", error);
+        
+        // Check if it's a foreign key constraint error for user_id
+        if (error.message.includes("violates foreign key constraint") && 
+            error.message.includes("user_id")) {
+          
+          console.log("Foreign key constraint error - attempting to create user record");
+          
+          // Try to create the missing user record
+          try {
+            const { error: userError } = await supabase
+              .from("users")
+              .insert({
+                id: user?.id,
+                email: user?.email || "",
+                first_name: user?.user_metadata?.first_name || "",
+                last_name: user?.user_metadata?.last_name || "",
+                phone: user?.user_metadata?.phone || "",
+                role: "guest",
+                password_hash: "managed_by_supabase_auth",
+              });
+
+            if (userError) {
+              console.error("Failed to create user record:", userError);
+              throw new Error("User profile creation failed. Please contact support.");
+            }
+
+            // Retry the booking creation
+            const { error: retryError } = await supabase
+              .from("bookings")
+              .insert(bookingData);
+
+            if (retryError) {
+              throw retryError;
+            }
+
+            toast({
+              title: "Success",
+              description: "Booking created successfully",
+            });
+
+            await fetchBookings();
+            setDialogOpen(false);
+            resetForm();
+            return;
+
+          } catch (userCreationError) {
+            console.error("User creation error:", userCreationError);
+            throw new Error("Failed to create user profile. Please try signing out and back in.");
+          }
+        }
+        
+        throw error;
+      }
 
       toast({
         title: "Success",
@@ -242,6 +328,7 @@ const Bookings = () => {
       setDialogOpen(false);
       resetForm();
     } catch (error: any) {
+      console.error("Booking creation failed:", error);
       toast({
         title: "Booking Failed",
         description: error.message || "Failed to create booking",

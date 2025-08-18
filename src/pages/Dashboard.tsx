@@ -1,15 +1,10 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import supabase from "../../supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  Hotel, 
-  Users, 
-  Calendar, 
-  FileText, 
-  Shield, 
-  LogOut,
-  UserCircle,
-  BookOpen
+  Hotel, Users, Calendar, FileText, Shield, LogOut, UserCircle 
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -17,10 +12,33 @@ const Dashboard = () => {
   const { userProfile, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
 
+  const [guests, setGuests] = useState<any[]>([]);
+  const [loadingGuests, setLoadingGuests] = useState(true);
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/auth");
   };
+
+  // Fetch users (guests) from Supabase
+  useEffect(() => {
+    const fetchGuests = async () => {
+      setLoadingGuests(true);
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("role", "guest");
+
+      if (error) {
+        console.error("Error fetching guests:", error);
+      } else {
+        setGuests(data || []);
+      }
+      setLoadingGuests(false);
+    };
+
+    fetchGuests();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -34,7 +52,7 @@ const Dashboard = () => {
               <p className="text-sm text-muted-foreground">Guest Management System</p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <UserCircle className="h-5 w-5 text-muted-foreground" />
@@ -57,6 +75,23 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+        {/* Guests Section */}
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Guests</h2>
+          {loadingGuests ? (
+            <p>Loading guests...</p>
+          ) : (
+            <ul className="space-y-2">
+              {guests.map((guest) => (
+                <li key={guest.id} className="p-2 border rounded">
+                  {guest.first_name} {guest.last_name} - {guest.email}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Cards Section */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Rooms Card */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate("/rooms")}>
@@ -65,14 +100,10 @@ const Dashboard = () => {
                 <Hotel className="h-5 w-5" />
                 <span>Rooms</span>
               </CardTitle>
-              <CardDescription>
-                View and manage hotel rooms
-              </CardDescription>
+              <CardDescription>View and manage hotel rooms</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Browse available rooms, check status, and pricing
-              </p>
+              <p className="text-sm text-muted-foreground">Browse available rooms, check status, and pricing</p>
             </CardContent>
           </Card>
 
@@ -104,9 +135,7 @@ const Dashboard = () => {
                 <UserCircle className="h-5 w-5" />
                 <span>Profile</span>
               </CardTitle>
-              <CardDescription>
-                Manage your account settings
-              </CardDescription>
+              <CardDescription>Manage your account settings</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
@@ -124,47 +153,11 @@ const Dashboard = () => {
                     <Users className="h-5 w-5" />
                     <span>Users</span>
                   </CardTitle>
-                  <CardDescription>
-                    Manage user accounts
-                  </CardDescription>
+                  <CardDescription>Manage user accounts</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
                     View and manage guest and admin accounts
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate("/audit")}>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Shield className="h-5 w-5" />
-                    <span>Audit Logs</span>
-                  </CardTitle>
-                  <CardDescription>
-                    Security and activity monitoring
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Review system activities and security events
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate("/files")}>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <FileText className="h-5 w-5" />
-                    <span>File Manager</span>
-                  </CardTitle>
-                  <CardDescription>
-                    Manage uploaded files
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    View and manage guest file uploads
                   </p>
                 </CardContent>
               </Card>
